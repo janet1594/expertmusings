@@ -1,0 +1,54 @@
+#This script  deletes the  snapshots for the  date of "DeleteOnCopy" expired.
+
+import boto3
+import collections
+import datetime
+import time
+import sys
+region = 'ap-south-1'
+ec = boto3.client('ec2', region)
+ec2 = boto3.resource('ec2', region)
+
+def lambda_handler(event, context):
+
+    snaps = ec2.snapshots.filter(OwnerIds=["xxxx"])
+    print (snaps)
+    to_tag = collections.defaultdict(list)
+    date = datetime.datetime.now()
+    date_fmt = date.strftime('%d-%m-%Y')
+    print ("Today's date and time:" + date.strftime('%d-%m-%Y:%H.%m.%s'))
+    
+    snaphots_list = []
+    
+    for snap in snaps:
+        try:
+            if snap.tags is not None:
+                deletion_date = [
+                    t.get('Value') for t in snap.tags
+                    if t['Key'] == 'DeleteOnCopy'][0]
+                
+                delete_date = time.strptime(deletion_date, "%d-%m-%Y")
+                
+                today_time = datetime.datetime.now().strftime('%d-%m-%Y')
+                today_date = time.strptime(today_time, '%d-%m-%Y')
+                
+                if delete_date < today_date:
+                    snaphots_list.append(snap.snapshot_id)
+  
+        except IndexError:
+             deletion_date = False
+             delete_date = False
+ 
+    print ("=============")
+        
+    print ("About to process the following Snapshots ")
+    print (snaphots_list)
+            
+    for snapshot in snaphots_list:
+        try:
+            snapst = ec.delete_snapshot(SnapshotId=snapshot)
+            print ("Deleted snapshot " + snapshot)
+            
+        except Exception as e:
+            print ("%s" % e.message)
+    print ("-------------")
